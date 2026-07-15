@@ -1,26 +1,719 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Cyber Security Learning</title>
-    <link rel="stylesheet" href="/static/style.css">
+<meta charset="UTF-8">
+<title>FILEDOCTOR // FlagQuest Forensics</title>
+<style>
+  :root{
+    --bg: #060a08;
+    --bg-panel: #0b120e;
+    --line: #1c2b22;
+    --green: #39ff8f;
+    --green-dim: #1f8f56;
+    --amber: #ffb454;
+    --red: #ff5c5c;
+    --blue: #6ec6ff;
+    --text: #c8ffe0;
+    --text-dim: #6f9a82;
+    --mono: 'Courier New', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--mono);}
+  body{
+    min-height:100vh;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: -1px -1px;
+    padding: 32px 20px 60px;
+  }
+  .wrap{max-width: 1080px; margin:0 auto;}
+
+  .terminal-bar{
+    display:flex; align-items:center; gap:8px;
+    padding:8px 14px; background:#0d150f; border:1px solid var(--line); border-bottom:none;
+  }
+  .dot{width:10px;height:10px;border-radius:50%;}
+  .dot.r{background:#ff5c5c;} .dot.y{background:#ffb454;} .dot.g{background:#39ff8f;}
+  .terminal-bar span.path{margin-left:10px; color:var(--text-dim); font-size:12px;}
+
+  header{
+    border:1px solid var(--line);
+    background: linear-gradient(180deg, rgba(57,255,143,0.05), transparent 60%);
+    padding: 22px 26px 20px;
+  }
+  h1{ margin:0; font-size: 26px; letter-spacing:3px; color:var(--green); text-shadow: 0 0 12px rgba(57,255,143,0.45); }
+  h1 .cursor{display:inline-block; width:12px; background:var(--green); margin-left:6px; animation: blink 1s steps(1) infinite;}
+  @keyframes blink{50%{opacity:0;}}
+  .subtitle{color:var(--text-dim); font-size:13px; margin-top:6px; line-height:1.6;}
+  .subtitle b{color:var(--amber); font-weight:normal;}
+
+  section{border:1px solid var(--line); border-top:none; background:var(--bg-panel); padding:22px 26px;}
+  .sec-title{ font-size:12px; letter-spacing:2px; color:var(--green-dim); text-transform:uppercase; margin: 0 0 14px; display:flex; align-items:center; gap:10px; }
+  .sec-title::before{content:'#'; color:var(--green);}
+  .sec-title .rule{flex:1; height:1px; background:var(--line);}
+
+  #dropzone{
+    border: 1.5px dashed var(--green-dim); padding: 36px 20px; text-align:center; cursor:pointer;
+    transition: border-color .15s, background .15s; position:relative;
+  }
+  #dropzone.drag{border-color: var(--green); background: rgba(57,255,143,0.06);}
+  #dropzone .big{font-size:14px; color:var(--text);}
+  #dropzone .small{font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.7;}
+  #dropzone .icon{font-size:34px; margin-bottom:10px; color:var(--green-dim);}
+  #fileInput{display:none;}
+
+  .filepill{ display:inline-flex; align-items:center; gap:10px; border:1px solid var(--green-dim); padding:6px 12px; font-size:12px; color:var(--green); margin-top: 14px; }
+  .filepill button{ background:none;border:none;color:var(--red);cursor:pointer;font-family:var(--mono);font-size:12px; }
+
+  .formatrow{ display:flex; align-items:center; gap:14px; margin-top:16px; flex-wrap:wrap; }
+  select#formatSelect{
+    background: #04100a; color:var(--green); border:1px solid var(--green-dim);
+    font-family:var(--mono); padding:9px 12px; font-size:12px; letter-spacing:.5px;
+  }
+  .badge{
+    display:inline-flex; align-items:center; gap:8px; border:1px solid var(--green);
+    color:var(--green); padding:6px 14px; font-size:12px; letter-spacing:1px;
+    background: rgba(57,255,143,0.08);
+  }
+  .badge.unknown{border-color:var(--red); color:var(--red); background:rgba(255,92,92,0.08);}
+  .badge .dotpulse{width:8px;height:8px;border-radius:50%;background:currentColor; box-shadow:0 0 8px currentColor;}
+
+  button.action{
+    background: var(--green); color:#03130a; border:none; font-family:var(--mono); font-weight:bold;
+    letter-spacing:1px; padding: 12px 22px; cursor:pointer; font-size:13px; text-transform:uppercase;
+    transition: transform .1s, box-shadow .15s;
+  }
+  button.action:hover{ box-shadow: 0 0 18px rgba(57,255,143,0.5); transform: translateY(-1px);}
+  button.action:disabled{background:#274436; color:#6f9a82; cursor:not-allowed; box-shadow:none; transform:none;}
+  button.ghost{ background:transparent; border:1px solid var(--green-dim); color:var(--green); font-family:var(--mono); padding:10px 18px; cursor:pointer; font-size:12px; letter-spacing:1px; }
+  button.ghost:hover{border-color:var(--green); background:rgba(57,255,143,0.06);}
+  button.ghost:disabled{opacity:.35; cursor:not-allowed;}
+  .btnrow{display:flex; gap:12px; margin-top:16px; flex-wrap:wrap; align-items:center;}
+
+  #log{ font-size:12.5px; line-height:1.85; white-space:pre-wrap; word-break:break-word; max-height: 300px; overflow-y:auto; padding-right:6px; }
+  #log .ok::before{content:'[OK]  '; color:var(--green);}
+  #log .warn::before{content:'[FIX] '; color:var(--amber);}
+  #log .err::before{content:'[ERR] '; color:var(--red);}
+  #log .info::before{content:'[..]  '; color:var(--text-dim);}
+  #log div{margin-bottom:2px;}
+
+  #resultArea{display:none;}
+  .imgbox{ border:1px solid var(--line); background: repeating-conic-gradient(#0e1712 0% 25%, #0a100c 0% 50%) 50% / 20px 20px; padding: 14px; text-align:center; min-height:120px; display:flex; align-items:center; justify-content:center;}
+  .imgbox img{max-width:100%; max-height:340px; border:1px solid var(--green-dim);}
+  .imgbox iframe{width:100%; height:360px; border:1px solid var(--green-dim); background:#fff;}
+  .imgbox .nopreview{color:var(--text-dim); font-size:12px; line-height:1.8;}
+  .grid2{display:grid; grid-template-columns: 1fr 1fr; gap:20px;}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr;}}
+
+  .stat{ display:flex; justify-content:space-between; font-size:12px; padding:5px 0; border-bottom:1px dotted var(--line); gap:10px;}
+  .stat span:first-child{color:var(--text-dim); flex-shrink:0;}
+  .stat span:last-child{color:var(--green); text-align:right; word-break:break-word;}
+
+  .refgrid{ display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:12px; font-size:12px;}
+  .refcard{border:1px solid var(--line); padding:10px 12px;}
+  .refcard .ext{color:var(--blue); font-weight:bold; letter-spacing:1px;}
+  .refcard .hex{color:var(--amber); margin-top:4px; letter-spacing:1px;}
+
+  footer{border:1px solid var(--line); border-top:none; padding:14px 26px; font-size:11px; color:var(--text-dim); text-align:center;}
+</style>
 </head>
 <body>
+<div class="wrap">
 
-<div class="container">
-    <h1 class="glow">🔐 Cyber Security Learning Platform</h1>
-    <p class="subtitle">Learn • Practice • Hack Ethically</p>
+  <div class="terminal-bar">
+    <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+    <span class="path">flagquest@forensics:~/file_repair$</span>
+  </div>
 
-    <div class="cards">
-        <div class="card">Web Security</div>
-        <div class="card">Cryptography</div>
-        <div class="card">CTF Practice</div>
-        <div class="card">Linux Basics</div>
+  <header>
+    <h1>FILEDOCTOR<span class="cursor">&nbsp;</span></h1>
+    <div class="subtitle">
+      Detects the true file format and repairs deliberately corrupted headers — magic bytes, dimension
+      fields, and CRC checksums — entirely in your browser. Nothing is uploaded anywhere.
+      Supports <b>PNG · JPEG · PDF · GIF · BMP · ZIP</b>.
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-title">01 // Load corrupted file<div class="rule"></div></div>
+    <div id="dropzone">
+      <div class="icon">&#8659;</div>
+      <div class="big">Drop any corrupted file here, or click to browse</div>
+      <div class="small">Extension doesn't matter — the tool reads raw bytes and figures out what it actually is.</div>
+      <input type="file" id="fileInput" accept="*/*">
+    </div>
+    <div id="filePillWrap"></div>
+
+    <div class="formatrow">
+      <div>
+        <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:6px;">TARGET FORMAT</label>
+        <select id="formatSelect">
+          <option value="auto">Auto-detect (recommended)</option>
+          <option value="png">Force: PNG</option>
+          <option value="jpeg">Force: JPEG / JFIF</option>
+          <option value="pdf">Force: PDF</option>
+          <option value="gif">Force: GIF</option>
+          <option value="bmp">Force: BMP</option>
+          <option value="zip">Force: ZIP</option>
+        </select>
+      </div>
+      <div id="detectBadgeWrap"></div>
     </div>
 
-    <a href="/login" class="btn">Login</a>
+    <div class="btnrow">
+      <button class="action" id="repairBtn" disabled>&#9881; Analyze &amp; Repair</button>
+      <button class="ghost" id="resetBtn" disabled>Reset</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-title">02 // Repair log<div class="rule"></div></div>
+    <div id="log"><div class="info">Waiting for file...</div></div>
+  </section>
+
+  <section id="resultArea">
+    <div class="sec-title">03 // Result<div class="rule"></div></div>
+    <div class="grid2">
+      <div>
+        <div class="imgbox" id="previewWrap"><div class="nopreview">No preview</div></div>
+        <div class="btnrow">
+          <a class="action" id="downloadBtn" style="text-decoration:none; display:inline-block;">&#8681; Download Fixed File</a>
+        </div>
+      </div>
+      <div>
+        <div class="stat"><span>Corrected format</span><span id="statFormat">-</span></div>
+        <div class="stat"><span>File extension</span><span id="statExt">-</span></div>
+        <div class="stat"><span>Original size</span><span id="statOrigSize">-</span></div>
+        <div class="stat"><span>Fixed size</span><span id="statFixedSize">-</span></div>
+        <div class="stat"><span>Dimensions</span><span id="statDims">-</span></div>
+        <div class="stat"><span>Signature</span><span id="statSig">-</span></div>
+        <div class="stat"><span>Structural fixes</span><span id="statStruct">-</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-title">04 // Magic byte reference<div class="rule"></div></div>
+    <div class="refgrid">
+      <div class="refcard"><div class="ext">PNG</div><div class="hex">89 50 4E 47 0D 0A 1A 0A</div></div>
+      <div class="refcard"><div class="ext">JPEG / JFIF</div><div class="hex">FF D8 FF E0</div></div>
+      <div class="refcard"><div class="ext">JPEG / Exif</div><div class="hex">FF D8 FF E1</div></div>
+      <div class="refcard"><div class="ext">PDF</div><div class="hex">25 50 44 46 2D (%PDF-)</div></div>
+      <div class="refcard"><div class="ext">GIF89a</div><div class="hex">47 49 46 38 39 61</div></div>
+      <div class="refcard"><div class="ext">BMP</div><div class="hex">42 4D (BM)</div></div>
+      <div class="refcard"><div class="ext">ZIP</div><div class="hex">50 4B 03 04</div></div>
+    </div>
+  </section>
+
+  <footer>FileDoctor · client-side file-signature forensics · built for FlagQuest CTF workflows</footer>
 </div>
 
-<script src="/static/script.js"></script>
+<script>
+/* ============ shared byte utilities ============ */
+function u32(bytes, offset){ return ((bytes[offset]<<24) | (bytes[offset+1]<<16) | (bytes[offset+2]<<8) | bytes[offset+3]) >>> 0; }
+function writeU32(bytes, offset, val){
+  bytes[offset]=(val>>>24)&0xFF; bytes[offset+1]=(val>>>16)&0xFF; bytes[offset+2]=(val>>>8)&0xFF; bytes[offset+3]=val&0xFF;
+}
+function writeU32LE(bytes, offset, val){
+  bytes[offset]=val&0xFF; bytes[offset+1]=(val>>>8)&0xFF; bytes[offset+2]=(val>>>16)&0xFF; bytes[offset+3]=(val>>>24)&0xFF;
+}
+function bytesToAscii(bytes, start, len){
+  let s = '';
+  const end = Math.min(start+len, bytes.length);
+  for (let i=start;i<end;i++) s += String.fromCharCode(bytes[i]);
+  return s;
+}
+function indexOfAscii(bytes, needle, from){
+  from = from || 0;
+  const n = needle.length;
+  const limit = bytes.length - n;
+  outer:
+  for (let i=from; i<=limit; i++){
+    for (let j=0;j<n;j++){
+      if (bytes[i+j] !== needle.charCodeAt(j)) continue outer;
+    }
+    return i;
+  }
+  return -1;
+}
+function indexOfBytesArr(bytes, needleArr, from){
+  from = from || 0;
+  const n = needleArr.length;
+  const limit = bytes.length - n;
+  outer:
+  for (let i=from; i<=limit; i++){
+    for (let j=0;j<n;j++){
+      if (bytes[i+j] !== needleArr[j]) continue outer;
+    }
+    return i;
+  }
+  return -1;
+}
+function toBase64(bytes){
+  const CHUNK = 0x8000;
+  let result = '';
+  for (let i=0; i<bytes.length; i+=CHUNK){
+    const chunk = bytes.subarray(i, i+CHUNK);
+    result += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(result);
+}
+
+/* ============ CRC32 (for PNG) ============ */
+const CRC_TABLE = (() => {
+  let table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){
+    let c = n;
+    for (let k = 0; k < 8; k++){ c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++){ c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); }
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+/* ============ format definitions ============ */
+const FORMATS = {
+  png: { name: 'PNG', ext: 'png', mime: 'image/png', sig: [0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A] },
+  jpeg:{ name: 'JPEG / JFIF', ext: 'jpg', mime: 'image/jpeg', sig: [0xFF,0xD8,0xFF] },
+  pdf: { name: 'PDF', ext: 'pdf', mime: 'application/pdf', sig: [0x25,0x50,0x44,0x46,0x2D] },
+  gif: { name: 'GIF', ext: 'gif', mime: 'image/gif', sig: [0x47,0x49,0x46,0x38] },
+  bmp: { name: 'BMP', ext: 'bmp', mime: 'image/bmp', sig: [0x42,0x4D] },
+  zip: { name: 'ZIP', ext: 'zip', mime: 'application/zip', sig: [0x50,0x4B,0x03,0x04] },
+};
+
+function sigMatches(bytes, sig){
+  if (bytes.length < sig.length) return false;
+  for (let i=0;i<sig.length;i++) if (bytes[i] !== sig[i]) return false;
+  return true;
+}
+
+/* ============ auto detection ============ */
+function detectFormat(bytes){
+  for (const key in FORMATS){
+    if (sigMatches(bytes, FORMATS[key].sig)) return {key, reason: 'Valid signature already present'};
+  }
+  // signature area corrupted -- scan for embedded structural markers
+  const scanLen = Math.min(bytes.length, 8192);
+  const head = bytes.subarray(0, scanLen);
+  if (indexOfAscii(head, 'IHDR', 0) !== -1) return {key:'png', reason:'Found embedded IHDR chunk marker'};
+  if (indexOfAscii(head, 'JFIF', 0) !== -1 || indexOfAscii(head, 'Exif', 0) !== -1) return {key:'jpeg', reason:'Found embedded JFIF/Exif marker'};
+  if (indexOfAscii(head, 'GIF8', 0) !== -1) return {key:'gif', reason:'Found embedded GIF8 marker'};
+  if (indexOfAscii(bytes, '%PDF', 0) !== -1) return {key:'pdf', reason:'Found embedded %PDF marker'};
+  if (indexOfAscii(bytes, 'endobj', 0) !== -1 || indexOfAscii(bytes, 'trailer', 0) !== -1 || indexOfAscii(bytes, '/Type', 0) !== -1) return {key:'pdf', reason:'Found PDF object structure keywords'};
+  if (indexOfBytesArr(bytes, [0x50,0x4B,0x03,0x04], 0) !== -1 || indexOfAscii(bytes, 'PK\x05\x06', 0) !== -1) return {key:'zip', reason:'Found embedded ZIP local/central header'};
+  return {key:null, reason:'No recognizable structure found — please select a format manually'};
+}
+
+/* ============ minimal DEFLATE/zlib inflate (for PNG IDAT) ============ */
+function inflateZlib(input){ return tinyInflate(input.subarray(2)); }
+function tinyInflate(input){
+  let pos = 0, bitBuf = 0, bitCnt = 0;
+  const output = [];
+  function readBit(){ if (bitCnt === 0){ bitBuf = input[pos++]; bitCnt = 8; } const bit = bitBuf & 1; bitBuf >>= 1; bitCnt--; return bit; }
+  function readBits(n){ let v=0; for(let i=0;i<n;i++) v |= readBit()<<i; return v; }
+  function buildTree(lengths){
+    const maxBits = Math.max(...lengths);
+    const blCount = new Array(maxBits+1).fill(0);
+    for (const l of lengths) if (l>0) blCount[l]++;
+    const nextCode = new Array(maxBits+1).fill(0);
+    let code = 0;
+    for (let bits=1; bits<=maxBits; bits++){ code = (code + blCount[bits-1]) << 1; nextCode[bits] = code; }
+    const codes = new Array(lengths.length).fill(0);
+    for (let i=0;i<lengths.length;i++){ const len=lengths[i]; if(len>0){ codes[i]=nextCode[len]; nextCode[len]++; } }
+    const map = {};
+    for (let i=0;i<lengths.length;i++){ const len=lengths[i]; if(len>0){ const key = len+':'+codes[i].toString(2).padStart(len,'0'); map[key]=i; } }
+    return {map, maxBits};
+  }
+  function decodeSymbol(tree){
+    let codeStr='';
+    for (let len=1; len<=tree.maxBits; len++){ codeStr += readBit().toString(); const key = len+':'+codeStr; if (key in tree.map) return tree.map[key]; }
+    throw new Error('Invalid Huffman code');
+  }
+  const LEN_BASE=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  const LEN_EXTRA=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DIST_BASE=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  const DIST_EXTRA=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const CLEN_ORDER=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+  function fixedLitTree(){ const l=new Array(288); for(let i=0;i<144;i++)l[i]=8; for(let i=144;i<256;i++)l[i]=9; for(let i=256;i<280;i++)l[i]=7; for(let i=280;i<288;i++)l[i]=8; return buildTree(l); }
+  function fixedDistTree(){ return buildTree(new Array(30).fill(5)); }
+  let final=0;
+  while(!final){
+    final = readBit();
+    const type = readBits(2);
+    if (type===0){
+      bitCnt=0;
+      const len = input[pos] | (input[pos+1]<<8); pos+=4;
+      for (let i=0;i<len;i++) output.push(input[pos++]);
+    } else {
+      let litTree, distTree;
+      if (type===1){ litTree=fixedLitTree(); distTree=fixedDistTree(); }
+      else if (type===2){
+        const hlit=readBits(5)+257, hdist=readBits(5)+1, hclen=readBits(4)+4;
+        const clLengths=new Array(19).fill(0);
+        for (let i=0;i<hclen;i++) clLengths[CLEN_ORDER[i]]=readBits(3);
+        const clTree=buildTree(clLengths);
+        const lengths=[];
+        while (lengths.length < hlit+hdist){
+          const sym=decodeSymbol(clTree);
+          if (sym<16) lengths.push(sym);
+          else if (sym===16){ const rep=readBits(2)+3; const prev=lengths[lengths.length-1]; for(let i=0;i<rep;i++) lengths.push(prev); }
+          else if (sym===17){ const rep=readBits(3)+3; for(let i=0;i<rep;i++) lengths.push(0); }
+          else { const rep=readBits(7)+11; for(let i=0;i<rep;i++) lengths.push(0); }
+        }
+        litTree=buildTree(lengths.slice(0,hlit));
+        distTree=buildTree(lengths.slice(hlit));
+      } else throw new Error('Invalid block type');
+      while (true){
+        const sym=decodeSymbol(litTree);
+        if (sym<256) output.push(sym);
+        else if (sym===256) break;
+        else {
+          const idx=sym-257;
+          const len=LEN_BASE[idx]+readBits(LEN_EXTRA[idx]);
+          const dsym=decodeSymbol(distTree);
+          const dist=DIST_BASE[dsym]+readBits(DIST_EXTRA[dsym]);
+          const start=output.length-dist;
+          for (let i=0;i<len;i++) output.push(output[start+i]);
+        }
+      }
+    }
+  }
+  return new Uint8Array(output);
+}
+
+/* ============ per-format repair routines ============ */
+const COLOR_CHANNELS = {0:1, 2:3, 3:1, 4:2, 6:4};
+
+function parsePngChunks(bytes){
+  const chunks = []; let pos = 8;
+  while (pos + 8 <= bytes.length){
+    const length = u32(bytes, pos);
+    const type = bytesToAscii(bytes, pos+4, 4);
+    const dataStart = pos+8, dataEnd = dataStart+length;
+    if (dataEnd+4 > bytes.length) break;
+    chunks.push({type, dataStart, dataEnd, crcOffset: dataEnd, headerOffset: pos});
+    pos = dataEnd+4;
+    if (type === 'IEND') break;
+  }
+  return chunks;
+}
+
+function repairPng(bytes, log){
+  let structFixes = 0, dims = '';
+  const sig = FORMATS.png.sig;
+  let sigBad = !sigMatches(bytes, sig);
+  if (sigBad){
+    const before = Array.from(bytes.slice(0,8)).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+    for (let i=0;i<8;i++) bytes[i]=sig[i];
+    log('warn', `Signature corrupted (was: ${before}) — patched to standard PNG magic bytes.`);
+    structFixes++;
+  } else log('ok', 'Signature valid.');
+
+  let chunks = parsePngChunks(bytes);
+  log('info', `Found ${chunks.length} chunk(s): ${chunks.map(c=>c.type).join(', ') || '(none)'}`);
+  const ihdr = chunks.find(c=>c.type==='IHDR');
+  if (!ihdr) throw new Error('No IHDR chunk found — structure too damaged to repair.');
+
+  let width = u32(bytes, ihdr.dataStart);
+  let height = u32(bytes, ihdr.dataStart+4);
+  const bitDepth = bytes[ihdr.dataStart+8];
+  const colorType = bytes[ihdr.dataStart+9];
+  log('info', `IHDR: ${width}x${height}, ${bitDepth}-bit, color type ${colorType}`);
+
+  if (height===0 || width===0){
+    log('warn', 'Zero dimension detected — recovering from compressed pixel data...');
+    const idatChunks = chunks.filter(c=>c.type==='IDAT');
+    if (idatChunks.length===0) throw new Error('No IDAT chunk(s) — cannot recover dimensions.');
+    let total = idatChunks.reduce((s,c)=>s+(c.dataEnd-c.dataStart),0);
+    const idatBytes = new Uint8Array(total); let off=0;
+    for (const c of idatChunks){ idatBytes.set(bytes.subarray(c.dataStart,c.dataEnd), off); off += (c.dataEnd-c.dataStart); }
+    const raw = inflateZlib(idatBytes);
+    const channels = COLOR_CHANNELS[colorType];
+    if (channels===undefined) throw new Error('Unsupported color type: '+colorType);
+    if (width===0){
+      log('err', 'Width is zero — automatic recovery only supports zeroed height.');
+    } else {
+      const rowLen = Math.ceil(width*channels*bitDepth/8)+1;
+      height = Math.round(raw.length/rowLen);
+      writeU32(bytes, ihdr.dataStart+4, height);
+      log('warn', `Height recovered: ${height}px (row length ${rowLen} bytes).`);
+      structFixes++;
+    }
+  } else log('ok', 'Dimensions look valid.');
+  dims = `${width} x ${height}`;
+
+  chunks = parsePngChunks(bytes);
+  let crcFixes = 0;
+  for (const c of chunks){
+    const chunkBytes = bytes.subarray(c.headerOffset+4, c.dataEnd);
+    const correctCrc = crc32(chunkBytes);
+    const storedCrc = u32(bytes, c.crcOffset);
+    if (correctCrc !== storedCrc){ writeU32(bytes, c.crcOffset, correctCrc); crcFixes++; log('warn', `${c.type} chunk CRC repaired.`); }
+  }
+  if (crcFixes===0) log('ok', 'All chunk CRCs valid.');
+  structFixes += crcFixes;
+
+  return {dims, structFixes: structFixes + ' fix(es) applied', mime:'image/png', ext:'png', previewKind:'image'};
+}
+
+function repairJpeg(bytes, log){
+  let fixes = 0;
+  if (bytes[0]!==0xFF || bytes[1]!==0xD8){
+    bytes[0]=0xFF; bytes[1]=0xD8;
+    log('warn', 'SOI marker (FF D8) corrupted — patched.');
+    fixes++;
+  } else log('ok', 'SOI marker valid.');
+
+  if (bytes[2] !== 0xFF){
+    bytes[2]=0xFF; bytes[3]=0xE0;
+    log('warn', 'APP0 marker corrupted — patched to standard JFIF marker (FF E0).');
+    fixes++;
+  } else log('ok', 'Marker segment after SOI looks structurally valid.');
+
+  // check EOI marker at end
+  if (bytes[bytes.length-2]!==0xFF || bytes[bytes.length-1]!==0xD9){
+    log('warn', 'EOI marker (FF D9) missing at end of file — appending it.');
+    const newBytes = new Uint8Array(bytes.length+2);
+    newBytes.set(bytes,0);
+    newBytes[bytes.length]=0xFF; newBytes[bytes.length+1]=0xD9;
+    bytes = newBytes;
+    fixes++;
+  } else log('ok', 'EOI marker present.');
+
+  // try to find SOF0/SOF2 for dimensions (informational only)
+  let dims = 'Unknown (see preview)';
+  for (let i=2;i<Math.min(bytes.length-9, 65536);i++){
+    if (bytes[i]===0xFF && (bytes[i+1]===0xC0 || bytes[i+1]===0xC2)){
+      const h = (bytes[i+5]<<8)|bytes[i+6];
+      const w = (bytes[i+7]<<8)|bytes[i+8];
+      dims = `${w} x ${h}`;
+      log('info', `Found SOF marker — dimensions ${w}x${h}.`);
+      break;
+    }
+  }
+
+  return {bytes, dims, structFixes: fixes+' fix(es) applied', mime:'image/jpeg', ext:'jpg', previewKind:'image'};
+}
+
+function repairGif(bytes, log){
+  let fixes = 0;
+  const sig89 = [0x47,0x49,0x46,0x38,0x39,0x61];
+  const sig87 = [0x47,0x49,0x46,0x38,0x37,0x61];
+  if (!sigMatches(bytes, sig89) && !sigMatches(bytes, sig87)){
+    for (let i=0;i<6;i++) bytes[i]=sig89[i];
+    log('warn', 'GIF signature corrupted — patched to GIF89a.');
+    fixes++;
+  } else log('ok', 'GIF signature valid.');
+
+  const width = bytes[6] | (bytes[7]<<8);
+  const height = bytes[8] | (bytes[9]<<8);
+  const dims = `${width} x ${height}`;
+  log('info', `Logical screen descriptor: ${width}x${height}`);
+
+  let result = bytes;
+  if (bytes[bytes.length-1] !== 0x3B){
+    log('warn', 'GIF trailer byte (0x3B) missing — appending it.');
+    const newBytes = new Uint8Array(bytes.length+1);
+    newBytes.set(bytes,0); newBytes[bytes.length]=0x3B;
+    result = newBytes;
+    fixes++;
+  } else log('ok', 'Trailer byte present.');
+
+  return {bytes: result, dims, structFixes: fixes+' fix(es) applied', mime:'image/gif', ext:'gif', previewKind:'image'};
+}
+
+function repairBmp(bytes, log){
+  let fixes = 0;
+  if (bytes[0]!==0x42 || bytes[1]!==0x4D){
+    bytes[0]=0x42; bytes[1]=0x4D;
+    log('warn', 'BMP signature corrupted — patched to "BM".');
+    fixes++;
+  } else log('ok', 'BMP signature valid.');
+
+  const storedSize = bytes[2] | (bytes[3]<<8) | (bytes[4]<<16) | (bytes[5]<<24);
+  if (storedSize !== bytes.length){
+    writeU32LE(bytes, 2, bytes.length);
+    log('warn', `File size field mismatched (was ${storedSize}) — updated to ${bytes.length}.`);
+    fixes++;
+  } else log('ok', 'File size field matches actual size.');
+
+  const width = bytes[18] | (bytes[19]<<8) | (bytes[20]<<16) | (bytes[21]<<24);
+  const height = bytes[22] | (bytes[23]<<8) | (bytes[24]<<16) | (bytes[25]<<24);
+  const dims = `${width} x ${height}`;
+  log('info', `DIB header reports ${width}x${height}`);
+
+  return {bytes, dims, structFixes: fixes+' fix(es) applied', mime:'image/bmp', ext:'bmp', previewKind:'image'};
+}
+
+function repairPdf(bytes, log){
+  let fixes = 0;
+  const sig = FORMATS.pdf.sig;
+  if (!sigMatches(bytes, sig)){
+    for (let i=0;i<sig.length;i++) bytes[i]=sig[i];
+    // default to version 1.4 if we can't detect otherwise
+    const verStr = '1.4\n';
+    const verBytes = Array.from(verStr).map(c=>c.charCodeAt(0));
+    for (let i=0;i<verBytes.length && (5+i)<bytes.length;i++) bytes[5+i]=verBytes[i];
+    log('warn', 'PDF header signature corrupted — patched to "%PDF-1.4".');
+    fixes++;
+  } else log('ok', 'PDF signature valid.');
+
+  const tail = bytesToAscii(bytes, Math.max(0,bytes.length-64), 64);
+  let result = bytes;
+  if (tail.indexOf('%%EOF') === -1){
+    log('warn', 'Missing "%%EOF" trailer — appending it.');
+    const suffix = '\n%%EOF\n';
+    const suffixBytes = new Uint8Array(Array.from(suffix).map(c=>c.charCodeAt(0)));
+    const newBytes = new Uint8Array(bytes.length + suffixBytes.length);
+    newBytes.set(bytes,0); newBytes.set(suffixBytes, bytes.length);
+    result = newBytes;
+    fixes++;
+  } else log('ok', '%%EOF trailer present.');
+
+  const hasXref = indexOfAscii(result, 'xref', 0) !== -1;
+  const hasStartxref = indexOfAscii(result, 'startxref', 0) !== -1;
+  log(hasXref && hasStartxref ? 'ok' : 'warn', hasXref && hasStartxref ? 'xref table and startxref found.' : 'xref/startxref not clearly found — deep structural repair beyond header is not attempted automatically.');
+
+  return {bytes: result, dims: 'N/A (document)', structFixes: fixes+' fix(es) applied', mime:'application/pdf', ext:'pdf', previewKind:'pdf'};
+}
+
+function repairZip(bytes, log){
+  let fixes = 0;
+  const sig = FORMATS.zip.sig;
+  if (!sigMatches(bytes, sig)){
+    for (let i=0;i<sig.length;i++) bytes[i]=sig[i];
+    log('warn', 'ZIP local file header signature corrupted — patched to PK\\x03\\x04.');
+    fixes++;
+  } else log('ok', 'ZIP local file header signature valid.');
+
+  const hasEOCD = indexOfAscii(bytes, 'PK\x05\x06', 0) !== -1;
+  log(hasEOCD ? 'ok' : 'warn', hasEOCD ? 'End-of-central-directory record found.' : 'End-of-central-directory record not found — full archive repair beyond the header is not attempted automatically.');
+
+  return {bytes, dims: 'N/A (archive)', structFixes: fixes+' fix(es) applied', mime:'application/zip', ext:'zip', previewKind:'none'};
+}
+
+const REPAIRERS = { png: repairPng, jpeg: repairJpeg, pdf: repairPdf, gif: repairGif, bmp: repairBmp, zip: repairZip };
+
+/* ============ UI wiring ============ */
+let originalBytes = null;
+let fixedBytes = null;
+let originalFileName = 'challenge';
+let detectedKey = null;
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const repairBtn = document.getElementById('repairBtn');
+const resetBtn = document.getElementById('resetBtn');
+const logEl = document.getElementById('log');
+const filePillWrap = document.getElementById('filePillWrap');
+const resultArea = document.getElementById('resultArea');
+const previewWrap = document.getElementById('previewWrap');
+const downloadBtn = document.getElementById('downloadBtn');
+const formatSelect = document.getElementById('formatSelect');
+const detectBadgeWrap = document.getElementById('detectBadgeWrap');
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('drag'); if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if (e.target.files.length) loadFile(e.target.files[0]); });
+
+function loadFile(file){
+  originalFileName = (file.name || 'challenge').replace(/\.[^.]+$/, '');
+  const reader = new FileReader();
+  reader.onload = () => {
+    originalBytes = new Uint8Array(reader.result);
+    filePillWrap.innerHTML = `<div class="filepill">${escapeHtml(file.name)} · ${originalBytes.length} bytes<button onclick="clearFile()">&times;</button></div>`;
+    repairBtn.disabled = false;
+    resetBtn.disabled = false;
+    clearLog();
+    resultArea.style.display = 'none';
+
+    const det = detectFormat(originalBytes);
+    detectedKey = det.key;
+    if (det.key){
+      detectBadgeWrap.innerHTML = `<div class="badge"><span class="dotpulse"></span>Detected: ${FORMATS[det.key].name} — ${escapeHtml(det.reason)}</div>`;
+      formatSelect.value = 'auto';
+    } else {
+      detectBadgeWrap.innerHTML = `<div class="badge unknown"><span class="dotpulse"></span>Format not recognized — please choose one from the dropdown</div>`;
+    }
+    log('info', `Loaded ${file.name} (${originalBytes.length} bytes). ${det.key ? 'Detected as '+FORMATS[det.key].name+'.' : 'Could not auto-detect format.'} Click Analyze & Repair.`);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function clearFile(){
+  originalBytes=null; fixedBytes=null; detectedKey=null;
+  filePillWrap.innerHTML=''; detectBadgeWrap.innerHTML='';
+  repairBtn.disabled=true; resetBtn.disabled=true;
+  clearLog(); resultArea.style.display='none';
+  fileInput.value=''; formatSelect.value='auto';
+}
+resetBtn.addEventListener('click', clearFile);
+
+function clearLog(){ logEl.innerHTML=''; }
+function log(type, msg){ const d=document.createElement('div'); d.className=type; d.textContent=msg; logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; }
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+repairBtn.addEventListener('click', () => {
+  if (!originalBytes) return;
+  clearLog();
+  repairBtn.disabled = true;
+  try{
+    let key = formatSelect.value === 'auto' ? detectedKey : formatSelect.value;
+    if (!key) throw new Error('No format detected and none selected manually. Choose a format from the dropdown.');
+    log('info', `Repairing as ${FORMATS[key].name}...`);
+
+    let bytes = new Uint8Array(originalBytes); // working copy
+    const result = REPAIRERS[key](bytes, log);
+    const finalBytes = result.bytes || bytes;
+    fixedBytes = finalBytes;
+
+    log('ok', `Repair complete. Fixed file is ${finalBytes.length} bytes.`);
+
+    // preview
+    previewWrap.innerHTML = '';
+    if (result.previewKind === 'image'){
+      const b64 = toBase64(finalBytes);
+      const img = document.createElement('img');
+      img.src = `data:${result.mime};base64,${b64}`;
+      img.alt = 'Repaired preview';
+      previewWrap.appendChild(img);
+    } else if (result.previewKind === 'pdf'){
+      const b64 = toBase64(finalBytes);
+      const iframe = document.createElement('iframe');
+      iframe.src = `data:${result.mime};base64,${b64}`;
+      previewWrap.appendChild(iframe);
+    } else {
+      previewWrap.innerHTML = '<div class="nopreview">No inline preview for this format.<br>Download the file to inspect it.</div>';
+    }
+
+    // download link (data URI, works inside sandboxed viewers)
+    const b64dl = toBase64(finalBytes);
+    downloadBtn.href = `data:${result.mime};base64,${b64dl}`;
+    downloadBtn.download = `${originalFileName}_fixed.${result.ext}`;
+
+    document.getElementById('statFormat').textContent = FORMATS[key].name;
+    document.getElementById('statExt').textContent = '.' + result.ext;
+    document.getElementById('statOrigSize').textContent = originalBytes.length + ' bytes';
+    document.getElementById('statFixedSize').textContent = finalBytes.length + ' bytes';
+    document.getElementById('statDims').textContent = result.dims;
+    document.getElementById('statSig').textContent = 'Verified / patched';
+    document.getElementById('statStruct').textContent = result.structFixes;
+
+    resultArea.style.display = 'block';
+  } catch(err){
+    log('err', err.message);
+  } finally {
+    repairBtn.disabled = false;
+  }
+});
+</script>
 </body>
 </html>
